@@ -1,7 +1,7 @@
 # Unsupervised Deep Homography - PyTorch Implementation
 
 [**Unsupervised Deep Homography: A Fast and Robust Homography Estimation
-Model**](https://arxiv.org/abs/1709.03966)
+Model**](https://arxiv.org/abs/1709.03966)<br>
 Ty Nguyen, Steven W. Chen, Shreyas S. Shivakumar, Camillo J. Taylor, Vijay
 Kumar<br>
 
@@ -10,12 +10,12 @@ cd code/
 ```
 in code/ folder:
 
-`dataset.py`: class SyntheticDataset(torch.utils.data.Dataset) implementation
-`homography_model.py`: Unsupervised deep homography model implementation
+`dataset.py`: class SyntheticDataset(torch.utils.data.Dataset) implementation<br>
+`homography_model.py`: Unsupervised deep homography model implementation<br>
 `homography_CNN_synthetic.py`: Train and test
 
 ## Preparing training dataset (synthetic)
-Download MS-COCO 2014 dataset
+Download MS-COCO 2014 dataset<br>
 Store Train and test set into RAW_DATA_PATH and TEST_RAW_DATA_PATH respectly.
 ### Generate training dataset
 It will take a few hours to generate 100.000 data samples.
