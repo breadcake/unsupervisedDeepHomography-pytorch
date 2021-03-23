@@ -35,8 +35,7 @@ python homography_CNN_synthetic.py --mode train
 ## Test model with synthetic dataset
 Download pre-trained weights
 ```bash 
-链接：https://pan.baidu.com/s/102ilb5HJGydpeHtYelx_Xw 
-提取码：boq9 
+链接：https://pan.baidu.com/s/102ilb5HJGydpeHtYelx_Xw  提取码：boq9 
 ```
 Store the model to models/synthetic_models folder
 ```bash 
