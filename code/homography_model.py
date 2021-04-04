@@ -4,6 +4,36 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+def L1_smooth_loss(x, y):
+    abs_diff = torch.abs(x - y)
+    abs_diff_lt_1 = torch.le(abs_diff, 1)
+    return torch.mean(torch.where(abs_diff_lt_1, 0.5 * abs_diff ** 2, abs_diff - 0.5))
+
+def SSIM_loss(x, y, size=3):
+    # C = (K*L)^2 with K = max of intensity range (i.e. 255). L is very small
+    C1 = 0.01 ** 2
+    C2 = 0.03 ** 2
+
+    mu_x = F.avg_pool2d(x, size, 1, padding=0)
+    mu_y = F.avg_pool2d(y, size, 1, padding=0)
+
+    sigma_x = F.avg_pool2d(x ** 2, size, 1, padding=0) - mu_x ** 2
+    sigma_y = F.avg_pool2d(y ** 2, size, 1, padding=0) - mu_y ** 2
+    sigma_xy = F.avg_pool2d(x * y, size, 1, padding=0) - mu_x * mu_y
+
+    SSIM_n = (2 * mu_x * mu_y + C1) * (2 * sigma_xy + C2)
+    SSIM_d = (mu_x ** 2 + mu_y ** 2 + C1) * (sigma_x + sigma_y + C2)
+
+    SSIM = SSIM_n / SSIM_d
+
+    return torch.clamp((1 - SSIM) / 2, 0, 1)
+
+def NCC_loss(x, y):
+    """Consider x, y are vectors. Take L2 of the difference
+       of the them after being normalized by their length"""
+    len_x = torch.sqrt(torch.sum(x ** 2))
+    len_y = torch.sqrt(torch.sum(y ** 2))
+    return torch.sqrt(torch.sum((x / len_x - y / len_y) ** 2))
 
 class ConvBlock(nn.Module):
     def __init__(self, inchannels, outchannels, batch_norm=False, pool=True):
@@ -53,7 +83,7 @@ class HomographyModel(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, I1_aug, I2_aug, I_aug, h4p, patch_indices):
+    def forward(self, I1_aug, I2_aug, I_aug, h4p, gt, patch_indices):
         batch_size, _, img_h, img_w = I_aug.size()
         _, _, patch_size, patch_size = I1_aug.size()
 
@@ -83,10 +113,14 @@ class HomographyModel(nn.Module):
         pred_I2 = self.transform(patch_size, M_tile_inv, H_mat, M_tile,
                                  I_aug, patch_indices, batch_indices_tensor)
 
-        l1_loss = F.l1_loss(pred_I2, I2_aug)
+        h_loss = torch.sqrt(torch.mean((pred_h4p - gt)) ** 2)
+        rec_loss, ssim_loss, l1_loss, l1_smooth_loss, ncc_loss = self.build_losses(pred_I2, I2_aug)
 
         out_dict = {}
-        out_dict.update(l1_loss=l1_loss, pred_h4p=pred_h4p)
+        out_dict.update(h_loss=h_loss, rec_loss=rec_loss, ssim_loss=ssim_loss, l1_loss=l1_loss,
+                        l1_smooth_loss=l1_smooth_loss, ncc_loss=ncc_loss,
+                        pred_h4p=pred_h4p, H_mat=H_mat, pred_I2=pred_I2)
+
         return out_dict
 
     def build_model(self, I1_aug, I2_aug):
@@ -181,3 +215,11 @@ class HomographyModel(nn.Module):
         pred_I2 = torch.reshape(pred_I2_flat, [batch_size, patch_size, patch_size, 1])
 
         return pred_I2.permute(0, 3, 1, 2)
+
+    def build_losses(self, pred_I2, I2_aug):
+        rec_loss = torch.sqrt(torch.mean((pred_I2 - I2_aug) ** 2))
+        ssim_loss = torch.mean(SSIM_loss(pred_I2, I2_aug))
+        l1_loss = torch.mean(torch.abs(pred_I2 - I2_aug))
+        l1_smooth_loss = L1_smooth_loss(pred_I2, I2_aug)
+        ncc_loss = NCC_loss(I2_aug, pred_I2)
+        return rec_loss, ssim_loss, l1_loss, l1_smooth_loss, ncc_loss

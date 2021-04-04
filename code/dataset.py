@@ -47,12 +47,13 @@ def get_mesh_grid_per_img(patch_w, patch_h):
 class SyntheticDataset(Dataset):
     """Load synthetic data"""
     def __init__(self, data_path, mode, img_h, img_w, patch_size, do_augment):
-        if mode == "train":
+        self.mode = mode
+        if self.mode == "train":
             self.data_path = data_path + "train/"
             self.pts1_file = os.path.join(self.data_path, 'pts1.txt')
             self.filenames_file = os.path.join(self.data_path, 'train_synthetic.txt')
             self.gt_file = os.path.join(self.data_path, 'gt.txt')
-        elif mode == "test":
+        elif self.mode == "test":
             self.data_path = data_path + "test/"
             self.pts1_file = os.path.join(self.data_path, 'test_pts1.txt')
             self.filenames_file = os.path.join(self.data_path, 'test_synthetic.txt')
@@ -87,8 +88,14 @@ class SyntheticDataset(Dataset):
 
         # Data Augmentation
         do_augment = np.random.uniform(0, 1)
-        I_aug, I_prime_aug = self.joint_augment_image_pair(I, I_prime, 0, 255) \
-            if do_augment > (1 - self.do_augment) else (I, I_prime)
+        # Training: use joint augmentation (images in one pair are inserted same noise)
+        # Test: use disjoint augmentation (images in one pair are inserted different noise)
+        if self.mode == 'train':
+            I_aug, I_prime_aug = self.joint_augment_image_pair(I, I_prime, 0, 255) \
+                if do_augment > (1 - self.do_augment) else (I, I_prime)
+        else:
+            I_aug, I_prime_aug = self.disjoint_augment_image_pair(I, I_prime, 0, 255) \
+                if do_augment > (1 - self.do_augment) else (I, I_prime)
 
         # Standardize images
         I = self.norm_img(I, self.mean_I, self.std_I)
@@ -129,19 +136,7 @@ class SyntheticDataset(Dataset):
         I2 = torch.reshape(I2_flat, [self.patch_size, self.patch_size, 1]).permute(2, 0, 1)
         I1_aug = torch.reshape(I1_aug_flat, [self.patch_size, self.patch_size, 1]).permute(2, 0, 1)
         I2_aug = torch.reshape(I2_aug_flat, [self.patch_size, self.patch_size, 1]).permute(2, 0, 1)
-        # import matplotlib.pyplot as plt
-        # plt.subplot(221), plt.imshow(self.denorm_img(I.numpy(), self.mean_I, self.std_I)[:,:,::-1])
-        # plt.subplot(222), plt.imshow(self.denorm_img(I_prime.numpy(), self.mean_I, self.std_I)[:,:,::-1])
-        # plt.subplot(223), plt.imshow(self.denorm_img(I_aug.numpy(), self.mean_I, self.std_I)[:,:,::-1])
-        # plt.subplot(224), plt.imshow(self.denorm_img(I_prime_aug.numpy(), self.mean_I, self.std_I)[:,:,::-1])
-        #
-        # plt.figure()
-        # plt.gray()
-        # plt.subplot(221), plt.imshow(I1.permute(1,2,0))
-        # plt.subplot(222), plt.imshow(I2.permute(1,2,0))
-        # plt.subplot(223), plt.imshow(I1_aug.permute(1,2,0))
-        # plt.subplot(224), plt.imshow(I2_aug.permute(1,2,0))
-        # plt.show()
+
         return I1, I2, I1_aug, I2_aug, I_aug, I_prime_aug, pts1_tensor, gt_tensor, patch_indices
 
     def read_image(self, image_path, img_h, img_w):
@@ -156,10 +151,35 @@ class SyntheticDataset(Dataset):
         img = np.transpose(img, [2, 0, 1])  # torch [C,H,W]
         return img
 
-    def denorm_img(self, img, mean, std):
-        img = np.transpose(img, [1, 2, 0])
-        img = img * std + mean
-        return np.uint8(img)
+    def disjoint_augment_image_pair(self, img1, img2, min_val=0, max_val=255):
+        # Randomly shift gamma
+        random_gamma = np.random.uniform(0.8, 1.2)
+        img1_aug = img1 ** random_gamma
+        random_gamma = np.random.uniform(0.8, 1.2)
+        img2_aug = img2 ** random_gamma
+
+        # Randomly shift brightness
+        random_brightness = np.random.uniform(0.5, 2.0)
+        img1_aug = img1_aug * random_brightness
+        random_brightness = np.random.uniform(0.5, 2.0)
+        img2_aug = img2_aug * random_brightness
+
+        # Randomly shift color
+        random_colors = np.random.uniform(0.8, 1.2, 3)
+        white = np.ones([img1.shape[0], img1.shape[1], 1])
+        color_image = np.concatenate([white * random_colors[i] for i in range(3)], axis=2)
+        img1_aug *= color_image
+
+        random_colors = np.random.uniform(0.8, 1.2, 3)
+        white = np.ones([img1.shape[0], img1.shape[1], 1])
+        color_image = np.concatenate([white * random_colors[i] for i in range(3)], axis=2)
+        img2_aug *= color_image
+
+        # Saturate
+        img1_aug = np.clip(img1_aug, min_val, max_val)
+        img2_aug = np.clip(img2_aug, min_val, max_val)
+
+        return img1_aug, img2_aug
 
     def joint_augment_image_pair(self, img1, img2, min_val=0, max_val=255):
         # Randomly shift gamma
@@ -187,7 +207,8 @@ class SyntheticDataset(Dataset):
 
 
 if __name__ == "__main__":
-    TrainDataset = SyntheticDataset(data_path="../data/synthetic/45/train/",
+    TrainDataset = SyntheticDataset(data_path="../data/synthetic/45/",
+                                    mode='train',
                                     img_h=240,
                                     img_w=320,
                                     patch_size=128,

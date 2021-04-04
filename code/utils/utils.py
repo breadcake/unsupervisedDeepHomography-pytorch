@@ -3,9 +3,10 @@ import cv2
 import os
 import matplotlib.pyplot as plt
 
+
 def denorm_img(img):
-    img = np.transpose(img, [1, 2, 0])
     if len(img.shape) == 3:
+        img = np.transpose(img, [1, 2, 0])  # torch [C,H,W]
         mean = np.array([118.93, 113.97, 102.60]).reshape([1, 1, 3])
         std = np.array([69.85, 68.81, 72.45]).reshape([1, 1, 3])
     elif len(img.shape) == 2:
@@ -53,13 +54,13 @@ def draw_matches(img1, kp1, img2, kp2, output_img_file=None, color_set=None, sho
     # We're drawing them side by side.  Get dimensions accordingly.
     # Handle both color and grayscale images.
     if len(img1.shape) == 3:
-        new_shape = (max(img1.shape[0], img2.shape[0]), img1.shape[1]+img2.shape[1], img1.shape[2])
+        new_shape = (max(img1.shape[0], img2.shape[0]), img1.shape[1] + img2.shape[1], img1.shape[2])
     elif len(img1.shape) == 2:
-        new_shape = (max(img1.shape[0], img2.shape[0]), img1.shape[1]+img2.shape[1])
+        new_shape = (max(img1.shape[0], img2.shape[0]), img1.shape[1] + img2.shape[1])
     new_img = np.zeros(new_shape, type(img1.flat[0]))
     # Place images onto the new image.
-    new_img[0:img1.shape[0],0:img1.shape[1]] = img1
-    new_img[0:img2.shape[0],img1.shape[1]:img1.shape[1]+img2.shape[1]] = img2
+    new_img[0:img1.shape[0], 0:img1.shape[1]] = img1
+    new_img[0:img2.shape[0], img1.shape[1]:img1.shape[1] + img2.shape[1]] = img2
 
     # Draw lines between points
 
@@ -74,10 +75,14 @@ def draw_matches(img1, kp1, img2, kp2, output_img_file=None, color_set=None, sho
 
     if output_img_file is not None and grid_num_rows >= 3:
         for i in range(grid_num_rows):
-            cv2.line(new_img, tuple(kp1[i*grid_num_rows]), tuple(kp1[i*grid_num_rows + (grid_num_rows-1)]), line_color1, 1,  LINE_AA)
-            cv2.line(new_img, tuple(kp1[i]), tuple(kp1[i + (grid_num_rows-1)*grid_num_rows]), line_color1, 1,  cv2.LINE_AA)
-            cv2.line(new_img, tuple(kp2_on_stack_image[i*grid_num_rows]), tuple(kp2_on_stack_image[i*grid_num_rows + (grid_num_rows-1)]), line_color2, 1,  cv2.LINE_AA)
-            cv2.line(new_img, tuple(kp2_on_stack_image[i]), tuple(kp2_on_stack_image[i + (grid_num_rows-1)*grid_num_rows]), line_color2, 1,  cv2.LINE_AA)
+            cv2.line(new_img, tuple(kp1[i * grid_num_rows]), tuple(kp1[i * grid_num_rows + (grid_num_rows - 1)]),
+                     line_color1, 1, LINE_AA)
+            cv2.line(new_img, tuple(kp1[i]), tuple(kp1[i + (grid_num_rows - 1) * grid_num_rows]), line_color1, 1,
+                     cv2.LINE_AA)
+            cv2.line(new_img, tuple(kp2_on_stack_image[i * grid_num_rows]),
+                     tuple(kp2_on_stack_image[i * grid_num_rows + (grid_num_rows - 1)]), line_color2, 1, cv2.LINE_AA)
+            cv2.line(new_img, tuple(kp2_on_stack_image[i]),
+                     tuple(kp2_on_stack_image[i + (grid_num_rows - 1) * grid_num_rows]), line_color2, 1, cv2.LINE_AA)
 
     if output_img_file is not None and grid_num_rows == 2:
         cv2.polylines(new_img, np.int32([kp2_on_stack_image]), 1, line_color2, 3)
@@ -91,19 +96,19 @@ def draw_matches(img1, kp1, img2, kp2, output_img_file=None, color_set=None, sho
         key2 = kp2[i]
         # Generate random color for RGB/BGR and grayscale images as needed.
         try:
-            c  = color_set[i]
+            c = color_set[i]
         except:
-            c = np.random.randint(0,256,3) if len(img1.shape) == 3 else np.random.randint(0,256)
+            c = np.random.randint(0, 256, 3) if len(img1.shape) == 3 else np.random.randint(0, 256)
         # So the keypoint locs are stored as a tuple of floats.  cv2.line(), like most other things,
         # wants locs as a tuple of ints.
         end1 = tuple(np.round(key1).astype(int))
         end2 = tuple(np.round(key2).astype(int) + np.array([img1.shape[1], 0]))
-        cv2.line(new_img, end1, end2, c, thickness,  cv2.LINE_AA)
-        cv2.circle(new_img, end1, r, c, thickness,  cv2.LINE_AA)
-        cv2.circle(new_img, end2, r, c, thickness,  cv2.LINE_AA)
+        cv2.line(new_img, end1, end2, c, thickness, cv2.LINE_AA)
+        cv2.circle(new_img, end1, r, c, thickness, cv2.LINE_AA)
+        cv2.circle(new_img, end2, r, c, thickness, cv2.LINE_AA)
     # pdb.set_trace()
     if show:
-        plt.figure(figsize=(15,15))
+        plt.figure(figsize=(15, 15))
         if len(img1.shape) == 3:
             plt.imshow(new_img)
         else:
@@ -114,3 +119,24 @@ def draw_matches(img1, kp1, img2, kp2, output_img_file=None, color_set=None, sho
         cv2.imwrite(output_img_file, new_img)
 
     return new_img
+
+
+def find_percentile(x):
+    x_sorted = np.sort(x)
+    len_x = len(x_sorted)
+
+    # Find mean, var of top 20:
+    tops_list = [0.3, 0.6, 1]
+    return_list = []
+    start_index = 0
+    for i in range(len(tops_list)):
+        print('>> Top %.0f -  %.0f %%' % (tops_list[i - 1] * 100 if i >= 1 else 0, tops_list[i] * 100))
+        stop_index = int(tops_list[i] * len_x)
+
+        interval = x_sorted[start_index:stop_index]
+        interval_mu = np.mean(interval)
+        interval_std = np.std(interval)
+
+        start_index = stop_index
+        return_list.append([interval_mu, interval_std])
+    return np.array(return_list)
