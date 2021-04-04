@@ -50,5 +50,9 @@ results |
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/2021032218020122.png?x-oss-process) | 
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/20210322180502181.png?x-oss-process) | 
 
+## Release History
+* **2021.4.5**
+    * Add TensorBoard visualization and some metrics.
+
 ##  Reference
 [https://github.com/tynguyen/unsupervisedDeepHomographyRAL2018](https://github.com/tynguyen/unsupervisedDeepHomographyRAL2018)
