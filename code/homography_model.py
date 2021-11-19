@@ -113,7 +113,7 @@ class HomographyModel(nn.Module):
         pred_I2 = self.transform(patch_size, M_tile_inv, H_mat, M_tile,
                                  I_aug, patch_indices, batch_indices_tensor)
 
-        h_loss = torch.sqrt(torch.mean((pred_h4p - gt)) ** 2)
+        h_loss = torch.sqrt(torch.mean((pred_h4p - gt) ** 2))
         rec_loss, ssim_loss, l1_loss, l1_smooth_loss, ncc_loss = self.build_losses(pred_I2, I2_aug)
 
         out_dict = {}
